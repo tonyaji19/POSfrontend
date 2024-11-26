@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const ItemForm = ({ onSubmit, initialItem, onCancel }) => {
+const ItemForm = ({ onSubmit, initialItem, onCancel, onRefresh }) => {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
@@ -33,30 +33,39 @@ const ItemForm = ({ onSubmit, initialItem, onCancel }) => {
         ? `https://localhost:7050/api/items/${initialItem.id}`
         : "https://localhost:7050/api/items";
       const method = initialItem ? "PUT" : "POST";
+
+      const token = localStorage.getItem("jwt");
+
       const response = await fetch(url, {
         method,
         body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`, // Tambahkan header Authorization
+        },
       });
       const data = await response.json();
 
-      // Periksa apakah ada properti 'message' dan 'item' dalam respons
-      if (
-        data.message &&
-        data.message.includes("Successfully added item.") &&
-        data.item
-      ) {
-        if (initialItem) {
-          // Untuk pembaruan, fetch item yang telah diperbarui
-          onSubmit(data.item); // Perbarui data item yang sudah diubah
-        } else {
-          // Untuk item baru, API kemungkinan akan mengembalikan item baru
+      // Periksa apakah ada properti 'message' dalam respons
+      if (data.message) {
+        // Tampilkan notifikasi
+        setNotification(data.message);
+
+        // Panggil onSubmit jika tersedia
+        if (data.item) {
           onSubmit(data.item);
         }
-        // alert(
-        //   `Data ${initialItem ? "updated" : "added"} Successfully added item.!`
-        // ); // Tampilkan pesan berhasil
+
+        // Reset form
         resetForm();
-        onCancel(); // Menutup modal setelah berhasil
+
+        // Panggil fungsi onRefresh untuk memperbarui data
+        if (onRefresh) {
+          onRefresh();
+        }
+
+        // Tutup modal
+        onCancel();
+        window.location.reload();
       } else {
         console.error("Unexpected API response format:", data);
         throw new Error("Unexpected API response format");
@@ -155,18 +164,16 @@ const ItemForm = ({ onSubmit, initialItem, onCancel }) => {
           Image
         </label>
         <div className="relative">
-          {/* Input file yang disembunyikan */}
           <input
             id="image"
             type="file"
             className="hidden"
-            onChange={(e) => setImage(e.target.files[0])} // Fungsi tetap terjaga
+            onChange={(e) => setImage(e.target.files[0])}
           />
-          {/* Tombol Choose File */}
           <button
             type="button"
             className="w-full py-2 px-4 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 flex justify-center items-center"
-            onClick={() => document.getElementById("image").click()} // Men-trigger input file
+            onClick={() => document.getElementById("image").click()}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -7,6 +7,8 @@ const Items = () => {
   const [items, setItems] = useState([]);
   const [editingItem, setEditingItem] = useState(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [notification, setNotification] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const modalRef = useRef(null);
   const navigate = useNavigate();
 
@@ -14,6 +16,7 @@ const Items = () => {
     const token = localStorage.getItem("jwt");
 
     if (!token) {
+      setNotification("Session expired. Please log in again.");
       navigate("/");
     } else {
       fetchItems();
@@ -35,19 +38,22 @@ const Items = () => {
   }, []);
 
   const fetchItems = async () => {
+    setIsLoading(true);
     try {
       const token = localStorage.getItem("jwt");
       const response = await fetch("https://localhost:7050/api/items", {
         method: "GET",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
       const data = await response.json();
       setItems(data);
     } catch (error) {
+      setNotification("Error fetching items.");
       console.error("Error fetching items:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -57,61 +63,70 @@ const Items = () => {
       const response = await fetch("https://localhost:7050/api/items", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(newItem),
       });
-      const data = await response.json();
-      setItems([...items, data]);
-      setIsFormVisible(false);
+      if (response.ok) {
+        fetchItems();
+        setNotification("Item added successfully!");
+        setTimeout(() => setNotification(""), 3000);
+        setIsFormVisible(false);
+      } else {
+        setNotification("Error adding item.");
+      }
     } catch (error) {
+      setNotification("Error adding item.");
       console.error("Error adding item:", error);
     }
   };
 
   const handleUpdateItem = async (updatedItem) => {
-    if (updatedItem && updatedItem.id) {
-      try {
-        const token = localStorage.getItem("jwt");
-        const response = await fetch(
-          `https://localhost:7050/api/items/${updatedItem.id}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(updatedItem),
-          }
-        );
-        const data = await response.json();
-        setItems(
-          items.map((item) =>
-            item.id === updatedItem.id ? { ...item, ...data } : item
-          )
-        );
+    try {
+      const token = localStorage.getItem("jwt");
+      const response = await fetch(
+        `https://localhost:7050/api/items/${updatedItem.id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(updatedItem),
+        }
+      );
+      if (response.ok) {
+        fetchItems();
+        setNotification("Item updated successfully!");
+        setTimeout(() => setNotification(""), 3000);
         setEditingItem(null);
         setIsFormVisible(false);
-      } catch (error) {
-        console.error("Error updating item:", error);
+      } else {
+        setNotification("Error updating item.");
       }
-    } else {
-      console.error("Updated item is missing or has no id:", updatedItem);
+    } catch (error) {
+      setNotification("Error updating item.");
+      console.error("Error updating item:", error);
     }
   };
 
   const handleDeleteItem = async (id) => {
     try {
       const token = localStorage.getItem("jwt");
-      await fetch(`https://localhost:7050/api/items/${id}`, {
+      const response = await fetch(`https://localhost:7050/api/items/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      setItems(items.filter((item) => item.id !== id));
+      if (response.ok) {
+        fetchItems();
+        setNotification("Item deleted successfully!");
+        setTimeout(() => setNotification(""), 3000);
+      } else {
+        setNotification("Error deleting item.");
+      }
     } catch (error) {
+      setNotification("Error deleting item.");
       console.error("Error deleting item:", error);
     }
   };
@@ -132,6 +147,14 @@ const Items = () => {
         <h1 className="text-4xl font-bold mb-8 text-left text-gray-800">
           Items
         </h1>
+
+        {/* Notification */}
+        {notification && (
+          <div className="mb-4 p-2 text-orange-300  rounded-lg">
+            {notification}
+          </div>
+        )}
+
         <div className="mb-8 flex justify-end">
           <button
             onClick={() => setIsFormVisible(!isFormVisible)}
@@ -144,7 +167,7 @@ const Items = () => {
         {/* Modal Form */}
         {isFormVisible && (
           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex justify-center items-center z-50">
-            <div ref={modalRef} className=" rounded-lg w-[50%]">
+            <div ref={modalRef} className="rounded-lg w-[50%]">
               <ItemForm
                 onSubmit={editingItem ? handleUpdateItem : handleAddItem}
                 initialItem={editingItem}
@@ -154,12 +177,19 @@ const Items = () => {
           </div>
         )}
 
-        {/* Item List */}
-        <ItemsList
-          items={items}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteItem}
-        />
+        {/* Loader or Items List */}
+        {isLoading ? (
+          <div className="flex justify-center items-center">
+            <div className="loader">Loading...</div>{" "}
+            {/* Tambahkan CSS spinner */}
+          </div>
+        ) : (
+          <ItemsList
+            items={items}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteItem}
+          />
+        )}
       </div>
     </div>
   );
